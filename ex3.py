@@ -95,15 +95,17 @@ def EM(articles, lidstone_lambda=0.02, k=10):
     w = np.zeros((N, num_classes))
     for idx in range(N):
         w[idx, idx % num_classes] = 1
+        #dist = np.random.normal(0,1,9)
+        #w[idx,:] = np.exp(dist)/np.sum(np.exp(dist))
 
     P, alpha = M_step(N, V, n, w, lidstone_lambda)
     likelihood = log_likelihood(N, n, k, P, alpha)
     likelihod_vals.append(likelihood)
 
     # do the EM until convergence
-    epsilon = abs(likelihood/const)
+    eps = abs(likelihood/const)
     delta = abs(likelihood)
-    while delta > epsilon:
+    while delta > eps:
         w = E_step(N, n, k, P, alpha)
         P, alpha = M_step(N, V, n, w, lidstone_lambda)
         likelihood = log_likelihood(N, n, k, P, alpha)
@@ -122,3 +124,4 @@ if __name__ == '__main__':
 
     likelihood, w = EM(articles_filtered, 0.1, 10)
     da.likelihood_and_perplexity(articles_filtered, likelihood)
+    da.confusion_matrix(w, articles_filtered, articles_headers)

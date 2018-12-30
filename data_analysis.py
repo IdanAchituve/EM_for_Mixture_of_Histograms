@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas
+import pandas as pd
 import os
 import utils
 
@@ -37,7 +37,8 @@ def confusion_matrix(w, articles, articles_headers):
     N = len(articles)  # number of documents
     clusters_per_doc = w.copy()
     # associate a document to a cluster if p(x_i|y_t) > min_prob
-    clusters_per_doc[clusters_per_doc > min_prob] = 1.0
+    clusters_per_doc[clusters_per_doc >= min_prob] = 1.0
+    clusters_per_doc[clusters_per_doc < min_prob] = 0.0
 
     topics = {"acq":0, "money-fx":1, "grain":2, "crude":3, "trade":4, "interest":5, "ship":6, "wheat":7, "corn":8}
 
@@ -49,9 +50,9 @@ def confusion_matrix(w, articles, articles_headers):
 
         # for document t get all clusters
         rel_clusters = []
-        for cluster in clusters_per_doc[doc]:
+        for idx, cluster in enumerate(clusters_per_doc[doc, :]):
             if cluster == 1.0:
-                rel_clusters.append(cluster)
+                rel_clusters.append(idx)
 
         # fill confusion matrix
         doc_topics = articles_headers[doc]  # get the topics of the document
@@ -59,3 +60,8 @@ def confusion_matrix(w, articles, articles_headers):
             doc_topic_idx = topics[doc_topic]
             for cluster in rel_clusters:
                 conf_matrix[cluster, doc_topic_idx] += 1
+
+    conf_matrix[:, -1] = num_docs_in_clusters  # on the last column put the number of documents
+    mat = pd.DataFrame(conf_matrix, columns=list(topics.keys()) + ["Number Of Articles"])
+    mat.sort_values("Number Of Articles", inplace=True, ascending=False)
+    ccc = 1
