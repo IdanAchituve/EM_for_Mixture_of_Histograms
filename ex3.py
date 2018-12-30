@@ -1,24 +1,64 @@
 import utils
 import numpy as np
+import data_analysis as da
 
-MAX = 999999999
-epsilon = 0.00001
 num_classes = 9
+const = 1000
+epsilon = 0.000001
+
+
+def log_likelihood(N, n, k, P, alpha):
+
+    likelihood = 0
+    # run over documents
+    for d in range(N):
+        z_i = []
+        # compute z per class given document t
+        for c in range(num_classes):
+            z_ti = np.log(alpha[c]) + np.dot(n[d, :], np.log(P[c, :]))  # z_i = ln(alpha_i) + sigma_over_k(n_tk*ln(P_ik))
+            z_i.append(z_ti)
+        z_i = np.asarray(z_i)
+        m_t = np.max(z_i)  # max z_ti
+
+        # sum the exponents of elements that pass the threshold
+        zi_minus_mi = 0
+        for c in range(num_classes):
+            if z_i[c] - m_t >= -k:
+                zi_minus_mi += np.exp(z_i[c] - m_t)
+
+        # lnL = sigma_over_t(m_t + sum(e^(z_ti-m_t)))
+        likelihood += m_t + np.log(zi_minus_mi)
+    return likelihood
 
 
 # the E step
 def E_step(N, n, k, P, alpha):
 
+    # run over documents
     for d in range(N):
         z_i = []
+        # compute z per class given document t
         for c in range(num_classes):
             z_ti = np.log(alpha[c]) + np.dot(n[d, :], np.log(P[c, :]))  # z_i = ln(alpha_i) + sigma_over_k(n_tk*ln(P_ik))
             z_i.append(z_ti)
         z_i = np.asarray(z_i)
         m = np.max(z_i)  # max z_ti
-        #### wrong!
-        z_i[z_i < m - k] = 0  # replace values far from the max value with 0
-        w_ti = np.reshape(np.exp(z_i)/np.sum(np.exp(z_i)), (1,-1))
+
+        # sum the exponents of elements that pass the threshold
+        denominator = 0
+        for c in range(num_classes):
+            if z_i[c] - m >= -k:
+                denominator += np.exp(z_i[c] - m)
+
+        # take only elements that pass the threshold
+        nominator = []
+        for c in range(num_classes):
+            if z_i[c] - m >= -k:
+                nominator.append(np.exp(z_i[c] - m))
+            else:
+                nominator.append(0)
+
+        w_ti = np.reshape(np.asarray(nominator)/denominator, (1, -1))
         w = w_ti if d == 0 else np.concatenate((w, w_ti))
     return w
 
@@ -49,16 +89,29 @@ def EM(articles, lidstone_lambda=0.02, k=10):
     N = len(articles)  # number of documents
     V = len(utils.get_word_counts(articles).keys())  # vocabulary size
     n = utils.words_per_doc_vec(articles)  # shape of NxV, each cell in n_tk
+    likelihod_vals = []
 
     # initial weights - each example belong to 1 cluster only
     w = np.zeros((N, num_classes))
     for idx in range(N):
         w[idx, idx % num_classes] = 1
 
-    delta = MAX
+    P, alpha = M_step(N, V, n, w, lidstone_lambda)
+    likelihood = log_likelihood(N, n, k, P, alpha)
+    likelihod_vals.append(likelihood)
+
+    # do the EM until convergence
+    epsilon = abs(likelihood/const)
+    delta = abs(likelihood)
     while delta > epsilon:
-        P, alpha = M_step(N, V, n, w, lidstone_lambda)
         w = E_step(N, n, k, P, alpha)
+        P, alpha = M_step(N, V, n, w, lidstone_lambda)
+        likelihood = log_likelihood(N, n, k, P, alpha)
+        likelihod_vals.append(likelihood)
+        delta = likelihod_vals[-1] - likelihod_vals[-2]
+        print(likelihood)
+
+    return likelihod_vals, w
 
 
 if __name__ == '__main__':
@@ -67,4 +120,5 @@ if __name__ == '__main__':
     articles, articles_headers = utils.read_data(dev_set)  # read data
     articles_filtered = utils.remove_rare_words(articles)
 
-    EM(articles_filtered, 0.02, 10)
+    likelihood, w = EM(articles_filtered, 0.1, 10)
+    da.likelihood_and_perplexity(articles_filtered, likelihood)
