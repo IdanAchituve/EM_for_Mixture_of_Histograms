@@ -1,10 +1,13 @@
 import utils
 import numpy as np
 import data_analysis as da
+import os
 
 num_classes = 9
-const = 1000
-epsilon = 0.000001
+const = 1000000
+epsilon = 0.00001
+k = 100
+lidstone_lambda = 0.1
 
 
 def log_likelihood(N, n, k, P, alpha):
@@ -64,7 +67,7 @@ def E_step(N, n, k, P, alpha):
 
 
 # the M step
-def M_step(N, V, n, w, lidstone_lambda):
+def M_step(N, V, n, w):
 
     # calc alpha_i per each class
     alpha = np.sum(w, axis=0)/N  # sum each column and divide by number of articles
@@ -84,7 +87,7 @@ def M_step(N, V, n, w, lidstone_lambda):
 
 
 # EM schema
-def EM(articles, lidstone_lambda=0.02, k=10):
+def EM(articles):
 
     N = len(articles)  # number of documents
     V = len(utils.get_word_counts(articles).keys())  # vocabulary size
@@ -95,10 +98,8 @@ def EM(articles, lidstone_lambda=0.02, k=10):
     w = np.zeros((N, num_classes))
     for idx in range(N):
         w[idx, idx % num_classes] = 1
-        #dist = np.random.normal(0,1,9)
-        #w[idx,:] = np.exp(dist)/np.sum(np.exp(dist))
 
-    P, alpha = M_step(N, V, n, w, lidstone_lambda)
+    P, alpha = M_step(N, V, n, w)
     likelihood = log_likelihood(N, n, k, P, alpha)
     likelihod_vals.append(likelihood)
 
@@ -107,7 +108,7 @@ def EM(articles, lidstone_lambda=0.02, k=10):
     delta = abs(likelihood)
     while delta > eps:
         w = E_step(N, n, k, P, alpha)
-        P, alpha = M_step(N, V, n, w, lidstone_lambda)
+        P, alpha = M_step(N, V, n, w)
         likelihood = log_likelihood(N, n, k, P, alpha)
         likelihod_vals.append(likelihood)
         delta = likelihod_vals[-1] - likelihod_vals[-2]
@@ -119,9 +120,12 @@ def EM(articles, lidstone_lambda=0.02, k=10):
 if __name__ == '__main__':
 
     dev_set = "./dataset/develop.txt"
+    save_path = "./output/"
+    os.makedirs(save_path, exist_ok=True)
+
     articles, articles_headers = utils.read_data(dev_set)  # read data
     articles_filtered = utils.remove_rare_words(articles)
 
-    likelihood, w = EM(articles_filtered, 0.1, 10)
+    likelihood, w = EM(articles_filtered)
     da.likelihood_and_perplexity(articles_filtered, likelihood)
-    da.confusion_matrix(w, articles_filtered, articles_headers)
+    da.confusion_matrix(save_path + "confusion_matrix.csv", w, articles_filtered, articles_headers)
