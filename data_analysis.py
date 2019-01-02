@@ -5,16 +5,17 @@ import os
 import utils
 
 min_prob = 0.0000001
+topics = {"acq": 0, "money-fx": 1, "grain": 2, "crude": 3, "trade": 4, "interest": 5, "ship": 6, "wheat": 7, "corn": 8}
 
-def likelihood_and_perplexity(articles, log_likelihood):
 
-    os.makedirs("./graphs/", exist_ok=True)
+def likelihood_and_perplexity(save_path, articles, log_likelihood):
+
     num_words = sum(utils.get_word_counts(articles).values())  # vocabulary size
     log_likelihood = np.asarray(log_likelihood)
     x_axis = np.asarray(list(range(len(log_likelihood))))
 
     # plot log likelihood
-    path = "./graphs/log_likelihood.png"
+    path = save_path + "log_likelihood.png"
     plt.tight_layout()
     plt.plot(x_axis, log_likelihood)
     plt.ylabel('Log Likelihood')
@@ -23,8 +24,9 @@ def likelihood_and_perplexity(articles, log_likelihood):
     plt.close()
 
     # plot the perplexity
-    path = "./graphs/perplexity.png"
+    path = save_path + "perplexity.png"
     perplexity = np.e**((-1/float(num_words)) * log_likelihood)
+    print("Best Perplexity: " + str(perplexity[-1]))
     plt.plot(x_axis, perplexity)
     plt.ylabel('Perplexity')
     plt.xlabel('Iteration')
@@ -39,8 +41,6 @@ def confusion_matrix(path, w, articles, articles_headers):
     # associate a document to a cluster if p(x_i|y_t) > min_prob
     clusters_per_doc[clusters_per_doc >= min_prob] = 1.0
     clusters_per_doc[clusters_per_doc < min_prob] = 0.0
-
-    topics = {"acq":0, "money-fx":1, "grain":2, "crude":3, "trade":4, "interest":5, "ship":6, "wheat":7, "corn":8}
 
     # count documents associate with each cluster
     num_docs_in_clusters = np.sum(clusters_per_doc, axis=0)
@@ -64,4 +64,34 @@ def confusion_matrix(path, w, articles, articles_headers):
     conf_matrix[:, -1] = num_docs_in_clusters  # on the last column put the number of documents
     mat = pd.DataFrame(conf_matrix, columns=list(topics.keys()) + ["Number Of Articles"])
     sorted_mat = mat.sort_values("Number Of Articles", ascending=False)
-    sorted_mat.to_csv(path)
+    sorted_mat.to_csv(path)  # save confusion matrix
+
+    return sorted_mat
+
+
+def calc_accuracy(w, articles, articles_headers, conf_matrix):
+
+    #conf_matrix = pd.read_csv("./output/confusion_matrix.csv", index_col=0)
+
+    conf_matrix.drop(columns=["Number Of Articles"], inplace=True)  # drop count column
+    keys = list(conf_matrix.index)  # get clusters by names corresponding to w matrix
+    values = list(conf_matrix.idxmax(axis=1))  # assign to cluster the most dominant topic
+    cluster_to_class = dict(zip(keys, values))
+
+    N = len(articles)  # number of documents
+    clusters_per_doc = w.copy()
+
+    accuracy = 0
+    for doc in range(N):
+
+        # for document t get the max cluster
+        max_cluster = np.argmax(clusters_per_doc[doc, :])
+        cluster_class = cluster_to_class[max_cluster]
+        doc_topics = articles_headers[doc]  # get the topics of the document
+        # increment if one of the document topics is the cluster topic
+        if cluster_class in doc_topics:
+            accuracy += 1
+
+    print("Accuracy: " + str(float(accuracy)/N))
+
+

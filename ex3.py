@@ -4,10 +4,10 @@ import data_analysis as da
 import os
 
 num_classes = 9
-const = 1000000
+const = 1000000000
 epsilon = 0.00001
-k = 100
-lidstone_lambda = 0.1
+k = 10
+lidstone_lambda = 0.15
 
 
 def log_likelihood(N, n, k, P, alpha):
@@ -106,13 +106,15 @@ def EM(articles):
     # do the EM until convergence
     eps = abs(likelihood/const)
     delta = abs(likelihood)
+    iter = 0
     while delta > eps:
         w = E_step(N, n, k, P, alpha)
         P, alpha = M_step(N, V, n, w)
         likelihood = log_likelihood(N, n, k, P, alpha)
         likelihod_vals.append(likelihood)
         delta = likelihod_vals[-1] - likelihod_vals[-2]
-        print(likelihood)
+        print("log-likelihood " + "iteration " + str(iter) + ": " + str(likelihood))
+        iter += 1
 
     return likelihod_vals, w
 
@@ -120,12 +122,13 @@ def EM(articles):
 if __name__ == '__main__':
 
     dev_set = "./dataset/develop.txt"
-    save_path = "./output/"
+    save_path = "./output_idan_300083029/"
     os.makedirs(save_path, exist_ok=True)
 
     articles, articles_headers = utils.read_data(dev_set)  # read data
     articles_filtered = utils.remove_rare_words(articles)
 
     likelihood, w = EM(articles_filtered)
-    da.likelihood_and_perplexity(articles_filtered, likelihood)
-    da.confusion_matrix(save_path + "confusion_matrix.csv", w, articles_filtered, articles_headers)
+    da.likelihood_and_perplexity(save_path, articles_filtered, likelihood)
+    conf_matrix = da.confusion_matrix(save_path + "confusion_matrix.csv", w, articles_filtered, articles_headers)
+    da.calc_accuracy(w, articles_filtered, articles_headers, conf_matrix)
