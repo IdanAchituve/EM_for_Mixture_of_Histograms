@@ -4,10 +4,10 @@ import data_analysis as da
 import os
 
 num_classes = 9
-const = 1000000000
+const = 10**9
 epsilon = 0.00001
 k = 10
-lidstone_lambda = 0.15
+lidstone_lambda = 1
 
 
 def log_likelihood(N, n, k, P, alpha):
@@ -107,14 +107,15 @@ def EM(articles):
     eps = abs(likelihood/const)
     delta = abs(likelihood)
     iter = 0
+    print("log-likelihood " + "iteration " + str(iter) + ": " + str(likelihood))
     while delta > eps:
         w = E_step(N, n, k, P, alpha)
         P, alpha = M_step(N, V, n, w)
         likelihood = log_likelihood(N, n, k, P, alpha)
         likelihod_vals.append(likelihood)
         delta = likelihod_vals[-1] - likelihod_vals[-2]
-        print("log-likelihood " + "iteration " + str(iter) + ": " + str(likelihood))
         iter += 1
+        print("log-likelihood " + "iteration " + str(iter) + ": " + str(likelihood))
 
     return likelihod_vals, w
 
